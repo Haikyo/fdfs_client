@@ -102,6 +102,56 @@ func (this *Client) UploadByBuffer(buffer []byte, fileExtName string) (string, e
 	return task.fileId, nil
 }
 
+func (this *Client) UploadSlaveByFilename(fileName string, masterFilename, prefixName, fileExtName string) (string, error) {
+	fileInfo, err := newFileInfo(fileName, nil, "")
+	defer fileInfo.Close()
+	if err != nil {
+		return "", err
+	}
+	storageInfo, err := this.queryStorageInfoWithTracker(TRACKER_PROTO_CMD_SERVICE_QUERY_STORE_WITHOUT_GROUP_ONE, "", "")
+	if err != nil {
+		return "", err
+	}
+
+	task := &storageUploadSlaveTask{}
+	//req
+	task.fileInfo = fileInfo
+	task.storagePathIndex = storageInfo.storagePathIndex
+	task.masterFilename = masterFilename
+	task.prefixName = prefixName
+	task.fileExtName = fileExtName
+
+	if err := this.doStorage(task, storageInfo); err != nil {
+		return "", err
+	}
+	return task.fileId, nil
+}
+
+func (this *Client) UploadSlaveByBuffer(buffer []byte, masterFilename, prefixName, fileExtName string) (string, error) {
+	fileInfo, err := newFileInfo("", buffer, fileExtName)
+	defer fileInfo.Close()
+	if err != nil {
+		return "", err
+	}
+	storageInfo, err := this.queryStorageInfoWithTracker(TRACKER_PROTO_CMD_SERVICE_QUERY_STORE_WITHOUT_GROUP_ONE, "", "")
+	if err != nil {
+		return "", err
+	}
+
+	task := &storageUploadSlaveTask{}
+	//req
+	task.fileInfo = fileInfo
+	task.storagePathIndex = storageInfo.storagePathIndex
+	task.masterFilename = masterFilename
+	task.prefixName = prefixName
+	task.fileExtName = fileExtName
+
+	if err := this.doStorage(task, storageInfo); err != nil {
+		return "", err
+	}
+	return task.fileId, nil
+}
+
 func (this *Client) DownloadToFile(fileId string, localFilename string, offset int64, downloadBytes int64) error {
 	groupName, remoteFilename, err := splitFileId(fileId)
 	if err != nil {
