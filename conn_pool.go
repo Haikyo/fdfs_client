@@ -122,11 +122,17 @@ func (this *connPool) get() (net.Conn, error) {
 			if this.count >= this.maxConns {
 				return nil, fmt.Errorf("reach maxConns %d", this.maxConns)
 			}
-			this.makeConn()
+			if err := this.makeConn(); err != nil {
+				return nil, err
+			}
 			continue
 		}
 		this.conns.Remove(e)
 		conn := e.Value.(pConn)
+		if !checkConn(conn) {
+			this.count--
+			continue
+		}
 		return conn, nil
 	}
 	//not reach
@@ -138,4 +144,16 @@ func (this *connPool) put(pConn pConn) error {
 	defer this.lock.Unlock()
 	pConn.pool.conns.PushBack(pConn)
 	return nil
+}
+
+func checkConn(conn net.Conn) bool {
+	header := &header{
+		cmd: FDFS_PROTO_CMD_ACTIVE_TEST,
+	}
+	header.SendHeader(conn)
+	header.RecvHeader(conn)
+	if header.cmd == TRACKER_PROTO_CMD_RESP && header.status == 0 {
+		return true
+	}
+	return false
 }

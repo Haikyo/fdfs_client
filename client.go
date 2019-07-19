@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 )
 
 type Client struct {
@@ -11,6 +12,9 @@ type Client struct {
 	storagePools    map[string]*connPool
 	storagePoolLock *sync.RWMutex
 	config          *config
+	trackerServers  []string
+	trackerCount    int32
+	trackerIndex    int32
 }
 
 func NewClient(trackerAddr []string, maxConns int) (*Client, error) {
@@ -40,7 +44,9 @@ func newClient(c *config) (*Client, error) {
 			return nil, err
 		}
 		client.trackerPools[addr] = trackerPool
+		client.trackerServers = append(client.trackerServers, addr)
 	}
+	client.trackerCount = int32(len(client.trackerServers))
 
 	return client, nil
 }
@@ -296,13 +302,25 @@ func (this *Client) getTrackerConn() (net.Conn, error) {
 	var trackerConn net.Conn
 	var err error
 	var getOne bool
-	for _, trackerPool := range this.trackerPools {
+	var idx = atomic.LoadInt32(&this.trackerIndex)
+	if idx >= this.trackerCount {
+		idx = 0
+	}
+	for i := int32(0); i < this.trackerCount; i++ {
+		tracker := this.trackerServers[idx]
+		trackerPool := this.trackerPools[tracker]
 		trackerConn, err = trackerPool.get()
 		if err == nil {
+			atomic.StoreInt32(&this.trackerIndex, idx)
 			getOne = true
 			break
 		}
+		idx++
+		if idx >= this.trackerCount {
+			idx = 0
+		}
 	}
+
 	if getOne {
 		return trackerConn, nil
 	}
