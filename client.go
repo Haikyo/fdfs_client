@@ -249,6 +249,26 @@ func (this *Client) DeleteFile(fileId string) error {
 	return this.doStorage(task, storageInfo)
 }
 
+func (this *Client) QueryFileInfo(fileId string) (*FileInfo, error) {
+	groupName, remoteFilename, err := splitFileId(fileId)
+	if err != nil {
+		return nil, err
+	}
+	storageInfo, err := this.queryStorageInfoWithTracker(TRACKER_PROTO_CMD_SERVICE_QUERY_FETCH_ONE, groupName, remoteFilename)
+	if err != nil {
+		return nil, err
+	}
+	task := &storageQueryFileInfoTask{}
+	//req
+	task.groupName = groupName
+	task.remoteFilename = remoteFilename
+
+	if err := this.doStorage(task, storageInfo); err != nil {
+		return nil, err
+	}
+	return task.fileInfo, nil
+}
+
 func (this *Client) doTracker(task task) error {
 	trackerConn, err := this.getTrackerConn()
 	if err != nil {

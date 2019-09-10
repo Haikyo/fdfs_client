@@ -321,3 +321,67 @@ func (this *storageUploadSlaveTask) RecvRes(conn net.Conn) error {
 	this.fileId = groupName + "/" + remoteFileName
 	return nil
 }
+
+type storageQueryFileInfoTask struct {
+	header
+	//req
+	groupName      string
+	remoteFilename string
+	fileInfo       *FileInfo
+	buffer         []byte
+}
+
+func (this *storageQueryFileInfoTask) SendReq(conn net.Conn) error {
+	this.cmd = STORAGE_PROTO_CMD_QUERY_FILE_INFO
+	this.pkgLen = int64(len(this.remoteFilename) + 16)
+
+	if err := this.SendHeader(conn); err != nil {
+		return err
+	}
+	buffer := new(bytes.Buffer)
+	byteGroupName := []byte(this.groupName)
+	var bufferGroupName [16]byte
+	for i := 0; i < len(byteGroupName); i++ {
+		bufferGroupName[i] = byteGroupName[i]
+	}
+	buffer.Write(bufferGroupName[:])
+	buffer.WriteString(this.remoteFilename)
+	if _, err := conn.Write(buffer.Bytes()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (this *storageQueryFileInfoTask) RecvRes(conn net.Conn) error {
+	if err := this.RecvHeader(conn); err != nil {
+		return err
+	}
+	this.buffer = make([]byte, this.pkgLen)
+	if err := writeFromConnToBuffer(conn, this.buffer, this.pkgLen); err != nil {
+		return fmt.Errorf("QueryFileInfo writeFromConnToBuffer %s", err)
+	}
+	var (
+		x               int32
+		createTimeStamp int32
+		crc32           int32
+		fileSize        int64
+	)
+	buff := bytes.NewBuffer(this.buffer)
+	binary.Read(buff, binary.BigEndian, &fileSize)
+	binary.Read(buff, binary.BigEndian, &x)
+	binary.Read(buff, binary.BigEndian, &createTimeStamp)
+	binary.Read(buff, binary.BigEndian, &x)
+	binary.Read(buff, binary.BigEndian, &crc32)
+	ipAddr, err := readCStrFromByteBuffer(buff, 16-1)
+	if err != nil {
+		return err
+	}
+	this.fileInfo = &FileInfo{
+		CreateTimeStamp: createTimeStamp,
+		CRC32:           crc32,
+		SourceID:        0,
+		FileSize:        fileSize,
+		SourceIPAddress: ipAddr,
+	}
+	return nil
+}

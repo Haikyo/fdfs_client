@@ -18,12 +18,21 @@ const (
 	STORAGE_PROTO_CMD_DELETE_FILE       = 12
 	STORAGE_PROTO_CMD_DOWNLOAD_FILE     = 14
 	STORAGE_PROTO_CMD_UPLOAD_SLAVE_FILE = 21
+	STORAGE_PROTO_CMD_QUERY_FILE_INFO   = 22
 	FDFS_PROTO_CMD_ACTIVE_TEST          = 111
 )
 
 const (
 	FDFS_GROUP_NAME_MAX_LEN = 16
 )
+
+type FileInfo struct {
+	CreateTimeStamp int32
+	CRC32           int32
+	SourceID        int
+	FileSize        int64
+	SourceIPAddress string
+}
 
 type storageInfo struct {
 	addr             string
